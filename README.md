@@ -1,10 +1,38 @@
 # ELSA
 
-ELSA is a semantic segmentation project built on Detectron2 and MaskFormer for aerial urban scene understanding. This open-source release focuses on three datasets:
+**ELSA** (**E**fficient **L**inear-attention with **S**imAM **A**rchitecture) is an efficient semantic segmentation framework for UAV (Unmanned Aerial Vehicle) imagery, built upon the mask classification paradigm of Mask2Former with a ConvNeXt-Tiny backbone.
 
-- `UAVid`
-- `UDD6`
-- `AeroScapes`
+## Architecture
+
+ELSA consists of three main components: a **ConvNeXt-Tiny backbone** that extracts multi-scale features, a **SimAM-enhanced pixel decoder** that fuses cross-scale features with parameter-free attention, and a **Transformer decoder with Linear Cross-Attention (LCA)**  that performs query-based mask classification. The three components work complementarily: LCA reduces decoder cost, SimAM provides zero-parameter feature modulation, and ConvNeXt-Tiny serves as an accuracy-efficiency base.
+
+## Key Features
+
+* **Linear Cross-Attention (LCA)**: Reduces decoder complexity from quadratic to linear with query-aware bias compensation, preserving per-query discriminability while significantly cutting computational cost.
+
+* **SimAM-Enhanced Pixel Decoder**: Integrates a parameter-free SimAM (Simple, Parameter-Free Attention Module) for feature modulation, adding zero learnable parameters while enhancing spatial discriminability.
+
+* **ConvNeXt-Tiny Backbone**: A modernized CNN architecture that bridges CNNs and Transformers, offering a superior accuracy-efficiency trade-off for UAV deployment.
+
+* **Mask Classification Paradigm**: Unified framework supporting semantic, instance, and panoptic segmentation via query-based mask prediction.
+
+## Performance
+
+This open-source release focuses on three datasets:
+
+* `UAVid`
+
+* `UDD6`
+
+* `AeroScapes`
+
+The following table provides a partial description of the datasets：
+
+| Dataset    | Classes | Train / Val / Test |
+| :--------- | :-----: | :----------------: |
+| UAVid      |    8    |   200 / 70 / 150   |
+| UDD6       |    6    |    90 / 16 / 35    |
+| AeroScapes |    11   |  2288 / 654 / 327  |
 
 The repository includes dataset registration, label preprocessing, training, evaluation, visualization, and basic model analysis scripts.
 
@@ -23,6 +51,14 @@ pip install -r requirements.txt
 
 ## Dataset Layout
 
+Download the datasets from their official sources:
+
+* **UAVid**: [https://uavid.nl/](https://uavid.nl/)
+
+* **UDD6**: [https://github.com/MarcWong/UDD](https://github.com/MarcWong/UDD)
+
+* **AeroScapes**: [https://github.com/ishann/aeroscapes](https://github.com/ishann/aeroscapes)
+
 Place the datasets under `datasets/` with the following structure:
 
 ```text
@@ -35,7 +71,7 @@ datasets/
 |  |- uavid_val/
 |  |  |- Images/
 |  |  |- Labels/
-|  |  `- Labels_processed/
+|  |   `- Labels_processed/
 |- UDD6/
 |  |- train/
 |  |  |- src/
@@ -43,32 +79,44 @@ datasets/
 |  |  `- gt_idx/
 |  |- val/
 |  |  |- src/
-|  |  |- gt/
+|  |   |- gt/
 |  |  `- gt_idx/
 |- Aeroscapes/
-|  |- train/
-|  |  |- JPEGImages/
-|  |  |- SegmentationClass/
-|  |- val/
-|  |  |- JPEGImages/
+|- train/
+|  |- JPEGImages/
+|  |   |- SegmentationClass/
+|- val/
+|  |- JPEGImages/
 |  |  |- SegmentationClass/
 ```
 
 ## Label Preprocessing
 
-`UAVid` uses RGB semantic labels and should be converted to class-index masks:
+### UAVid
+
+UAVid contains 8 semantic classes: **building, road, tree, low vegetation, moving car, static car, human, and background clutter**. The original labels are RGB color-coded and must be converted to class-index masks for training.
+
+The preprocessing script maps each RGB color tuple to its corresponding class index (0-7) and saves the result as single-channel PNG files in `Labels_processed/`. All training images are cropped to 1024×1024 during training.
 
 ```bash
 python datasets/UAVid/preprocess_uavid.py --dataset_path datasets/UAVid
 ```
 
-`UDD6` also requires label conversion before training:
+### UDD6
+
+UDD6 (UAV Drone Dataset 6) consists of 6 semantic classes: **facade, road, vegetation, vehicle, roof, and other**. The original ground-truth labels require conversion to class-index format before training.
+
+The conversion script transforms the original label format to indexed PNG files stored in `gt_idx/`. All images are cropped to 1024×1024 during training.
 
 ```bash
 python datasets/UDD6/convert_labels.py --dataset_path datasets/UDD6
 ```
 
-`AeroScapes` masks are already class-index PNGs (0-10, 255=unlabeled), so no color-to-index conversion is needed. The preprocessing script verifies the mask format and splits the official flat layout (`JPEGImages/` + `SegmentationClass/` + `ImageSets/trn.txt` + `val.txt`) into the `train/` and `val/` directories:
+### AeroScapes
+
+AeroScapes comprises 11 semantic classes: **person, bike, car, drone, boat, animal, obstacle, construction, vegetation, road, and sky**. The masks are already provided as class-index PNGs (values 0-10, with 255 representing unlabeled/ignore regions), so no color-to-index conversion is needed.
+
+The preprocessing script verifies the mask format and reorganizes the official flat layout into `train/` and `val/` directories. All images are cropped to 1024×1024 during training.
 
 ```bash
 python datasets/Aeroscapes/preprocess_aeroscapes.py --dataset_path datasets/Aeroscapes
@@ -99,9 +147,11 @@ python train_net.py --num-gpus 1 \
 
 The default output directories are defined in the base config files:
 
-- `configs/uavid/semantic-segmentation/Base-UAVid-SemanticSegmentation.yaml` (`./output_uavid`)
-- `configs/udd6/semantic-segmentation/Base-UDD6-SemanticSegmentation.yaml` (`./output_UDD`)
-- `configs/Aeroscapes/semantic-segmentation/Base-Aeroscapes-SemanticSegmentation.yaml` (`./output_aeroscapes`)
+* `configs/uavid/semantic-segmentation/Base-UAVid-SemanticSegmentation.yaml` (`./output_uavid`)
+
+* `configs/udd6/semantic-segmentation/Base-UDD6-SemanticSegmentation.yaml` (`./output_UDD`)
+
+* `configs/Aeroscapes/semantic-segmentation/Base-Aeroscapes-SemanticSegmentation.yaml` (`./output_aeroscapes`)
 
 Pretrained_model:
 
@@ -174,6 +224,10 @@ python visualize_aeroscapes_predictions.py \
 ## Acknowledgements
 
 ELSA builds on top of:
-- [PBSeg](https://github.com/zhangda1018/PBSeg)
-- [Detectron2](https://github.com/facebookresearch/detectron2)
-- [Mask2Former](https://github.com/facebookresearch/Mask2Former)
+
+* [PBSeg](https://github.com/zhangda1018/PBSeg)
+
+* [Detectron2](https://github.com/facebookresearch/detectron2)
+
+* [Mask2Former](https://github.com/facebookresearch/Mask2Former
+
